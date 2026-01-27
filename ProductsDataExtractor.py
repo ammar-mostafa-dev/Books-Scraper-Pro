@@ -18,7 +18,8 @@ Each extracted product is stored as a dictionary with the following structure:
     "description": str,          # Full product description text
     "rating": int,               # Numerical star rating (1-5)
     "stock_availability": bool,  # Boolean availability (e.g., "True","False")
-    "quantity_available": int,   # Numeric stock count
+    "quantity": int,   # Numeric stock count
+    "url" : str                  # string where the product data came from 
 }
 """
 # Helper Functions
@@ -29,11 +30,11 @@ def clean_description(text):
         return None
 
     try:
-        # 1. THE REPAIR: This fixes the 'â€™' symbols automatically
-        # It takes the 'Latin-1' mess and converts it back to proper UTF-8
+        #fixe the 'â€™' symbols automatically
+        #take the 'Latin-1' mess and convert it back to proper UTF-8
         text = text.encode('latin-1').decode('utf-8')
     except (UnicodeEncodeError, UnicodeDecodeError):
-        # If it's already clean, the above might fail, so we just keep going
+        # If it's already clean, the above might fail, so just keep going
         pass
 
     # 2. Handle HTML entities (like &amp; or &eacute;)
@@ -57,19 +58,31 @@ def clean_price(price_string):
         return float(price_cleaned)
     except (ValueError, TypeError):
         return None
-
 def extract_stock(text):
-    """Returns stock availability as bool and quantity as int or None."""
+    """
+    Parses the stock string (e.g., 'In stock (19 available)') to extract 
+    Boolean availability and the specific integer quantity.
+    """
+    # Case-insensitive check for basic availability status
     in_stock = "in stock" in text.lower()
+    
+    # Regex Pattern:
+    # \(      -> Matches literal opening parenthesis
+    # (\d+)   -> Captures one or more digits (the quantity)
+    # \s+     -> Handles one or more whitespace characters
+    # available -> Matches the literal word 'available'
+    # \)      -> Matches literal closing parenthesis
     match = re.search(r'\((\d+)\s+available\)', text)
+    
+    # Extract the first capture group if a match is found, else default to None
     quantity = int(match.group(1)) if match else None
+    
     return in_stock, quantity
-
 def extract_category(soup):
     """Extracts book category from breadcrumbs."""
     breadcrumb_links = soup.select('ul.breadcrumb li a')
     if len(breadcrumb_links) >= 2:
-        return breadcrumb_links[1].get_text(strip=True)
+        return breadcrumb_links[2].get_text(strip=True)
     return None
 
 def extract_title(soup):
@@ -126,16 +139,17 @@ def extract_product_data(product_url):
         'description': extract_description(soup),
         'category': extract_category(soup),
         'rating': extract_rating(soup),
+        'url': product_url
     }
     attributes.update(extract_price_data(soup))
     
     return attributes
 
-def extract_all_products_datas():
+def extract_all_products_datas(products_urls):
     """Extracts data from all products and logs missing info and progress."""
-    products_urls = extract_all_products_links()
-    all_products_data = []
+
     failures = 0
+    products_scraped = 0 
     # The global tracker for all missing attributes
     products_missing_attrs = {
         "title": {"count": 0, "urls": []},
@@ -148,7 +162,7 @@ def extract_all_products_datas():
         "stock_availability": {"count": 0, "urls": []},
         "quantity_available": {"count": 0, "urls": []}
     }
-    for i, url in enumerate(products_urls, start=1):
+    for url in products_urls : 
         product_data = extract_product_data(url)
         
         if not product_data:
@@ -156,7 +170,7 @@ def extract_all_products_datas():
             failures += 1
             if failures == 20:
                 logger.error("Breaking loop: 20 consecutive failures")
-                return all_products_data
+                break
             continue
 
         # get missing attributes for the current single product
@@ -174,52 +188,26 @@ def extract_all_products_datas():
                 if count <= 5:
                     logger.warning(f"Missing {attr} for {url}")
                     if count == 5 : 
-                        logger.info(f"Additional individual logs for {attr} will be hidden in a safe space")
+                        logger.info(f"Additional individual logs for {attr} won't be shown ")
 
                 # 2. Alert if it becomes a systematic problem
                 elif count == 20:
                     logger.error(f"ATTRIBUTE EXTRACTION FAILURE detected for {attr}. Ceasing individual logs.")
         
-
-        all_products_data.append(product_data)
+        yield product_data
+        products_scraped += 1 
         failures = 0
         time.sleep(0.4)
 
         # Batch log every 100 products
-        if i % 100 == 0:
-            logger.info(f"{i} products have been scraped successfully")
-    finalize_scraper(products_missing_attrs,len(all_products_data))
-    return all_products_data
-
-def finalize_scraper(products_missing_attrs, total_products):
-    print("\n" + "="*50)
-    print("        FINAL SCRAPING DIAGNOSTIC REPORT")
-    print("="*50)
+        if products_scraped % 50 == 0:
+            logger.info(f"+ {products_scraped} products have been scraped successfully")
+            
     
-    logger.info("Generating final diagnostic report...")
-    
-    for attr, data in products_missing_attrs.items():
-        count = data['count']
-        urls = data['urls']
-        success_rate = ((total_products - count) / total_products) * 100
 
-        if count == 0:
-            print(f"✅ {attr.upper():<20} | Success: {success_rate:>6.2f}% (Perfect)")
-        elif count < 20:
-            print(f"⚠️ {attr.upper():<20} | Success: {success_rate:>6.2f}% ({count} random gaps)")
-            # Log the specific URLs to the file for manual checking
-            for url in urls:
-                logger.warning(f"Gap in {attr}: {url}")
-        else:
-            print(f"❌ {attr.upper():<20} | Success: {success_rate:>6.2f}% (SYSTEMATIC FAILURE)")
-            logger.error(f"CRITICAL: {attr} selector likely broken. Failed on {count} products.")
-
-    print("="*50)
-    print(f"Scrape Complete. Total Products Processed: {total_products}")
-    print("Check 'scraper_errors.log' for deep-dive details.")
 
 def main(): 
-   products_datas = extract_all_products_datas() 
+   pass
    
 
 if __name__ == '__main__' : 

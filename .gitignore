@@ -1,16 +1,16 @@
 
-# Data files (Don't upload your results)
+# Data files 
 *.csv
 *.xlsx
 
-# Logs (Don't upload your history)
+# Logs 
 *.log
 
 # Python system files
 __pycache__/
 *.py[cod]
 *$py.class
-
+.DS_Store
 # Virtual Environment
 .venv/
 venv/

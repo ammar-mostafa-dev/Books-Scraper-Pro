@@ -27,7 +27,6 @@ def get_soup(url):
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()   # catches 4xx and 5xx status codes
     except Exception as e:
-        logger.error(f"Failed to fetch {url}: {e}")
         return None
     response.encoding = 'utf-8'
     soup = BeautifulSoup(response.text, 'lxml')
@@ -69,6 +68,8 @@ def extract_all_products_links():
     current_url = urljoin(catalogue_url ,'page-1.html')
     # current page num to help in tracking 
     current_page_num = 1
+    # pages extracted variables 
+    pages_extracted = 0
     # to store links of products
     all_links = []
     # to track failed attempts 
@@ -86,17 +87,19 @@ def extract_all_products_links():
             else : 
                 current_page_num += 1
                 current_url = build_next_page_url(current_page_num)
+                pages_extracted += 1
                 continue 
         # extract page links
         products_links = extract_page_links(soup)
         if products_links:
             all_links.extend(products_links)
             if current_page_num % 10 == 0 : 
-                logger.info(f'{current_page_num} Pages Products Links Have Been scraped Succsesfuly')
+                logger.info(f'{current_page_num} Pages Links Have Been scraped Succsesfuly')
+                
             # reset faillures 
             failures = 0
         else:
-            logger.warning(f"No page Links Found For Url {current_url}") 
+            logger.warning(f"No Products Links Found For Url {current_url}") 
             failures += 1 
             if failures == 5 : 
                 logger.error('Failed To Scrape Links')
@@ -108,14 +111,14 @@ def extract_all_products_links():
         if next_url : 
             current_url = next_url 
             current_page_num +=1 
+            pages_extracted += 1
             continue
         else : 
-            logger.info('All Pages Has Been Scraped ')
+            logger.info(f'{pages_extracted} Pages Has Been Scraped ')
             return all_links
 
 def main() : 
-    pages_links = extract_all_products_links()
-    logger.info(len(pages_links))
+    pass
 if __name__ == '__main__' : 
     # run file 
     main()
